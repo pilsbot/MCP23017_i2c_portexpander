@@ -2,7 +2,7 @@
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/Bool.hpp>
+#include <std_msgs/msg/bool.hpp>
 using std::placeholders::_1;
 
 class Portexpander_I2C_Bridge : public rclcpp::Node
@@ -21,7 +21,7 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
 			for(uint_fast8_t bit = 0; bit < 8; bit++)
 			{
 				std::string topic_name = base_name + (port == 0 ? "A" : "B");
-				topic_name += "/" + std::to_string(bit);
+				topic_name += "/_" + std::to_string(bit);
 				std::cout << "Registering topic " << topic_name << std::endl;
 				auto kack = std::bind(&Portexpander_I2C_Bridge::topic_callback, this, _1);//, port, bit);
 				_subscriptions.emplace_back(
