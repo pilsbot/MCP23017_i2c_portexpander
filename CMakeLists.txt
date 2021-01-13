@@ -22,15 +22,23 @@ find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 
-add_executable(portexpander-bridge src/portexpander-bridge.cpp)
-target_include_directories(portexpander-bridge PUBLIC
+add_executable(bridge src/bridge.cpp)
+target_include_directories(bridge PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
-ament_target_dependencies(portexpander-bridge rclcpp std_msgs)
+ament_target_dependencies(bridge rclcpp std_msgs)
 
-install(TARGETS portexpander-bridge
+install(TARGETS bridge
   DESTINATION lib/${PROJECT_NAME})
+  
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME})
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

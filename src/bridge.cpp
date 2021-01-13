@@ -35,15 +35,19 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
 	
   public:
     Portexpander_I2C_Bridge()
-    : Node("portexpander_I2C_Bridge")
+    : Node("portexpander_i2c_bridge")
     {
+		this->declare_parameter("i2c_device", "/dev/i2c-2");
+		std::string i2c_device = this->get_parameter("i2c_device").as_string();
+		std::cout << "using " << i2c_device << std::endl;
+		RCLCPP_INFO(this->get_logger(), "using %s", i2c_device.c_str());
+		
 		memset(&_state, 0, sizeof(State));
 #ifndef MOCKUP
 		//----- OPEN THE I2C BUS -----
-		std::string filename = "/dev/i2c-2";		//TODO: Read configuration
-		if ((i2c_bus = open(filename, O_RDWR)) < 0)
+		if ((i2c_bus = open(i2c_device, O_RDWR)) < 0)
 		{
-			perror("Failed to open the i2c bus");
+			perror("Failed to open the i2c bus at %s", i2c_device.c_str());
 			return;
 		}
 
@@ -67,7 +71,7 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
 		
 		
 		_subscriptions.reserve(2*8);
-		const std::string base_name = "portexpander_I2C_bridge/";
+		const std::string base_name = "portexpander_i2c_bridge/";
 		for(uint_fast8_t port = 0; port < 2; port++)
 		{
 			for(uint_fast8_t bit = 0; bit < 8; bit++)

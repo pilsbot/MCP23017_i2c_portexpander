@@ -1,0 +1,3 @@
+portexpander_i2c_bridge:
+  ros__parameters:
+    i2c_device: "/dev/i2c-2"
