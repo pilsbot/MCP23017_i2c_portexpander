@@ -21,11 +21,16 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
 	std::vector<rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr> _subscriptions;
 	struct State
 	{
-		uint8_t addr;
-		uint8_t ports[2];	//A and B
+		uint8_t port[2];	//A and B
 	} _state;
+
+	struct Message
+	{
+	    uint8_t addr;
+	    uint8_t data;
+	};
 #ifndef MOCKUP
-	FILE i2c_bus;
+	int i2c_bus;
 #endif
 	
 	static constexpr uint8_t IODIRA = 0x00;
@@ -38,38 +43,49 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
     : Node("portexpander_i2c_bridge")
     {
 		this->declare_parameter("i2c_device", "/dev/i2c-2");
+		this->declare_parameter("mcp_addr", 0x20);
 		std::string i2c_device = this->get_parameter("i2c_device").as_string();
-		std::cout << "using " << i2c_device << std::endl;
-		RCLCPP_INFO(this->get_logger(), "using %s", i2c_device.c_str());
+		int addr = this->get_parameter("mcp_addr").as_int();
+		RCLCPP_INFO(this->get_logger(), "using %s at addr 0x%x",
+		    i2c_device.c_str(), addr);
 		
 		memset(&_state, 0, sizeof(State));
 #ifndef MOCKUP
 		//----- OPEN THE I2C BUS -----
-		if ((i2c_bus = open(i2c_device, O_RDWR)) < 0)
+		if ((i2c_bus = open(i2c_device.c_str(), O_RDWR)) < 0)
 		{
-			perror("Failed to open the i2c bus at %s", i2c_device.c_str());
+		    RCLCPP_FATAL(this->get_logger(),
+		        "Failed to open the i2c bus at %s", i2c_device.c_str());
+			perror("I2C open");
 			return;
 		}
 
-		int addr = 0x20;
 		if (ioctl(i2c_bus, I2C_SLAVE, addr) < 0)
 		{
-			perror("Failed to acquire bus access and/or talk to slave.\n");
+            RCLCPP_FATAL(this->get_logger(),
+                "Failed to acquire bus access and/or talk to slave.");
+			perror("ioctl");
 			return;
-		}
-		
-		//TODO: Set PA+PB to zero (Or read config for default value?)
-		
-		// Set PA+PB to output
-		_state.addr = IODIRA;
-		if (write(i2c_bus, &_state, sizeof(State)) != sizeof(State))
-		{
-			/* ERROR HANDLING: i2c transaction failed */
-			std::cerr << "Failed to write to the i2c bus (" << i2c_bus << ")" << std::endl;
 		}
 #endif
 		
 		
+		// Set PA+PB to output (0)
+		//todo: maybe read default values?
+		Message output_dir{IODIRA, 0};
+        if (!write_to_device(output_dir))
+        {
+            RCLCPP_WARN(this->get_logger(),
+            "Failed to configure the i2c device (%d)", i2c_bus);
+        }
+        output_dir = {IODIRB, 0};
+        if (!write_to_device(output_dir))
+        {
+            RCLCPP_WARN(this->get_logger(),
+            "Failed to configure the i2c device (%d)", i2c_bus);
+        }
+
+
 		_subscriptions.reserve(2*8);
 		const std::string base_name = "portexpander_i2c_bridge/";
 		for(uint_fast8_t port = 0; port < 2; port++)
@@ -95,18 +111,34 @@ class Portexpander_I2C_Bridge : public rclcpp::Node
 		
 		RCLCPP_INFO(this->get_logger(), "Set port %s bit %u to %s",
 				 port == 0 ? "A" : "B", bitpos, msg->data ? "1" : "0");
+
+		auto state = _state.port[port];
+
 		if(msg->data)
-			_state.ports[port] |= 1 << bitpos;
+			state |= 1 << bitpos;
 		else
-			_state.ports[port] &= ~(1 << bitpos);
-#ifndef MOCKUP
-		_state.addr = GPIOPA;
-		if (write(i2c_bus, &_state, sizeof(State)) != sizeof(State))
+			state &= ~(1 << bitpos);
+
+		Message pinchange{port == 0 ? GPIOPA : GPIOPB, state};
+		if (!write_to_device(pinchange))
 		{
-			/* ERROR HANDLING: i2c transaction failed */
-			std::cerr << "Failed to write to the i2c bus (" << i2c_bus << ")" << std::endl;
+			RCLCPP_ERROR(this->get_logger(),
+			    "could not update pin!");
 		}
+    }
+
+    bool write_to_device(Message& msg) {
+#ifndef MOCKUP
+        if (write(i2c_bus, &msg, sizeof(Message)) != sizeof(Message))
+        {
+            /* TODO: error handling */
+            RCLCPP_WARN(this->get_logger(),
+            "Failed to write to the i2c device (%d)", i2c_bus);
+            perror("write");
+            return false;
+        }
 #endif
+        return true;
     }
 };
 

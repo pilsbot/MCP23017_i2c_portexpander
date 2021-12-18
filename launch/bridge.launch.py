@@ -15,6 +15,7 @@ def generate_launch_description():
         name = 'portexpander_i2c_bridge',
         executable = 'bridge',
         parameters = [config]
+        #parameters = [{"i2c_device": "/dev/null"}]
     )
     ld.add_action(node)
     return ld
